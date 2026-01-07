@@ -1,0 +1,124 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool isDark = false;
+
+  // Светлая тема
+  final ThemeData lightTheme = ThemeData(
+    brightness: Brightness.light,
+    primarySwatch: Colors.blue,
+    scaffoldBackgroundColor: Colors.grey[100],
+    textTheme: const TextTheme(
+      bodyMedium: TextStyle(fontSize: 16),
+    ),
+  );
+
+  final ThemeData darkTheme = ThemeData(
+    brightness: Brightness.dark,
+    primarySwatch: Colors.deepPurple,
+    scaffoldBackgroundColor: Colors.black,
+    textTheme: const TextTheme(
+      bodyMedium: TextStyle(fontSize: 16),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+      home: HomePage(
+        isDark: isDark,
+        onThemeChanged: () {
+          setState(() {
+            isDark = !isDark;
+          });
+        },
+      ),
+    );
+  }
+}
+
+class HomePage extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onThemeChanged;
+
+  const HomePage({
+    super.key,
+    required this.isDark,
+    required this.onThemeChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bool isWide = width > 600;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Adaptive Theme App'),
+        actions: [
+          Switch(
+            value: isDark,
+            onChanged: (_) => onThemeChanged(),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: EdgeInsets.all(isWide ? 32 : 16),
+        child: isWide ? _wideLayout(context) : _narrowLayout(context),
+      ),
+    );
+  }
+
+  Widget _narrowLayout(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _card(context, 'Карточка 1'),
+        const SizedBox(height: 16),
+        _card(context, 'Карточка 2'),
+      ],
+    );
+  }
+
+  Widget _wideLayout(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: _card(context, 'Карточка 1')),
+        const SizedBox(width: 24),
+        Expanded(child: _card(context, 'Карточка 2')),
+      ],
+    );
+  }
+
+  Widget _card(BuildContext context, String title) {
+    final isWide = MediaQuery.of(context).size.width > 600;
+
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: EdgeInsets.all(isWide ? 24 : 16),
+        child: Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontSize: isWide ? 22 : 18,
+              ),
+        ),
+      ),
+    );
+  }
+}
