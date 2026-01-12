@@ -4,120 +4,105 @@ void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  bool isDark = false;
-
-  // Светлая тема
-  final ThemeData lightTheme = ThemeData(
-    brightness: Brightness.light,
-    primarySwatch: Colors.blue,
-    scaffoldBackgroundColor: Colors.grey[100],
-    textTheme: const TextTheme(
-      bodyMedium: TextStyle(fontSize: 16),
-    ),
-  );
-
-  final ThemeData darkTheme = ThemeData(
-    brightness: Brightness.dark,
-    primarySwatch: Colors.deepPurple,
-    scaffoldBackgroundColor: Colors.black,
-    textTheme: const TextTheme(
-      bodyMedium: TextStyle(fontSize: 16),
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: lightTheme,
-      darkTheme: darkTheme,
-      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-      home: HomePage(
-        isDark: isDark,
-        onThemeChanged: () {
-          setState(() {
-            isDark = !isDark;
-          });
-        },
+      title: 'Image Gallery Demo',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: false,
       ),
+      home: const GalleryPage(),
     );
   }
 }
 
-class HomePage extends StatelessWidget {
-  final bool isDark;
-  final VoidCallback onThemeChanged;
+class GalleryPage extends StatelessWidget {
+  const GalleryPage({super.key});
 
-  const HomePage({
-    super.key,
-    required this.isDark,
-    required this.onThemeChanged,
-  });
+  
+  // Use reliable network image URLs so images load in the gallery.
+  // picsum.photos with seeds provides consistent, HTTPS-hosted images.
+  static final List<String> images = List.generate(
+    8,
+    (i) => 'https://picsum.photos/seed/${i + 1}/600/400',
+  );
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bool isWide = width > 600;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Adaptive Theme App'),
-        actions: [
-          Switch(
-            value: isDark,
-            onChanged: (_) => onThemeChanged(),
-          ),
+        title: const Text('Gallery'),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12.0),
+            child: Icon(Icons.image, size: 28, color: Colors.white),
+          )
         ],
       ),
-      body: Padding(
-        padding: EdgeInsets.all(isWide ? 32 : 16),
-        child: isWide ? _wideLayout(context) : _narrowLayout(context),
-      ),
-    );
-  }
-
-  Widget _narrowLayout(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _card(context, 'Карточка 1'),
-        const SizedBox(height: 16),
-        _card(context, 'Карточка 2'),
-      ],
-    );
-  }
-
-  Widget _wideLayout(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: _card(context, 'Карточка 1')),
-        const SizedBox(width: 24),
-        Expanded(child: _card(context, 'Карточка 2')),
-      ],
-    );
-  }
-
-  Widget _card(BuildContext context, String title) {
-    final isWide = MediaQuery.of(context).size.width > 600;
-
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: EdgeInsets.all(isWide ? 24 : 16),
-        child: Text(
-          title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontSize: isWide ? 22 : 18,
-              ),
-        ),
+      body: Column(
+        children: [
+          
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              children: const [
+                Icon(Icons.photo_library, size: 32, color: Colors.deepPurple),
+                SizedBox(width: 8),
+                Expanded(child: Text('Local and network images — scroll the gallery')),
+              ],
+            ),
+          ),
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              padding: const EdgeInsets.all(8),
+              children: images.map((path) {
+                final bool isNetwork = path.startsWith('http');
+                return Container(
+                  height: 180,
+                  clipBehavior: Clip.hardEdge,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Image (asset or network)
+                      isNetwork
+                          ? Image.network(
+                              path,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return const Center(child: CircularProgressIndicator());
+                              },
+                              errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image)),
+                            )
+                          : Image.asset(
+                              path,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image)),
+                            ),
+                      // Slight overlay with icon in bottom-right
+                      const Positioned(
+                        right: 6,
+                        bottom: 6,
+                        child: Icon(Icons.image, color: Colors.white70, size: 20),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
