@@ -1,81 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-// models imported where needed
-import '../providers/todo_provider.dart';
-import 'todo_detail_screen.dart';
-import 'todo_edit_screen.dart';
+import '../services/auth_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthService>(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Список задач'),
-      ),
-      body: Consumer<TodoProvider>(
-        builder: (context, provider, _) {
-          final items = provider.items;
-          if (items.isEmpty) {
-            return const Center(child: Text('Нет задач'));
-          }
-          return ListView.builder(
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final todo = items[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: ListTile(
-                  leading: Checkbox(
-                    value: todo.completed,
-                    onChanged: (_) => provider.toggleCompleted(todo.id),
-                  ),
-                  title: Text(todo.title),
-                  subtitle: todo.description != null ? Text(todo.description!) : null,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => TodoEditScreen(todo: todo),
-                            ),
-                          );
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.redAccent),
-                        onPressed: () => provider.removeTodo(todo.id),
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TodoDetailScreen(todo: todo),
-                      ),
-                    );
-                  },
-                ),
-              );
+        title: const Text('Маркетплейс — Главная'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              // don't await here to avoid using BuildContext after an async gap
+              auth.logout();
+              Navigator.of(context).pushReplacementNamed('/');
             },
-          );
-        },
+            icon: const Icon(Icons.logout),
+            tooltip: 'Выйти',
+          )
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const TodoEditScreen()),
-          );
-        },
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Добро пожаловать, ${auth.currentUser ?? 'гость'}!', style: const TextStyle(fontSize: 18)),
+            const SizedBox(height: 16),
+            const Text('Здесь будет список товаров (заглушка).'),
+          ],
+        ),
       ),
     );
   }
