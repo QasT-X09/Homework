@@ -1,0 +1,229 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+/// ======================
+///  DIO CLIENT
+/// ======================
+class DioClient {
+  static final DioClient _instance = DioClient._internal();
+  factory DioClient() => _instance;
+
+  late final Dio dio;
+
+  DioClient._internal() {
+    dio = Dio(
+      BaseOptions(
+        baseUrl: 'https://jsonplaceholder.typicode.com',
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
+        sendTimeout: const Duration(seconds: 5),
+      ),
+    );
+
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          debugPrint('➡️ REQUEST: ${options.method} ${options.uri}');
+          return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          debugPrint('✅ RESPONSE: ${response.statusCode}');
+          return handler.next(response);
+        },
+        onError: (error, handler) async {
+          debugPrint('❌ ERROR: ${error.message}');
+
+          // Retry только при сетевых ошибках
+          if (_shouldRetry(error)) {
+            try {
+              debugPrint('🔁 RETRYING...');
+              final cloneReq = await dio.request(
+                error.requestOptions.path,
+                data: error.requestOptions.data,
+                queryParameters: error.requestOptions.queryParameters,
+                options: Options(
+                  method: error.requestOptions.method,
+                ),
+              );
+              return handler.resolve(cloneReq);
+            } catch (_) {}
+          }
+
+          return handler.next(error);
+        },
+      ),
+    );
+  }
+
+  bool _shouldRetry(DioException error) {
+    return error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.unknown;
+  }
+}
+
+/// ======================
+///  APP
+/// ======================
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: HomePage(),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final Dio dio = DioClient().dio;
+  final CancelToken cancelToken = CancelToken();
+
+  bool isLoading = false;
+  double progress = 0;
+  String result = '';
+
+  @override
+  void dispose() {
+    cancelToken.cancel("Page disposed");
+    super.dispose();
+  }
+
+  Future<void> fetchData() async {
+    setState(() {
+      isLoading = true;
+      result = '';
+    });
+
+    try {
+      final response = await dio.get(
+        '/posts/1',
+        cancelToken: cancelToken,
+      );
+
+      setState(() {
+        result = response.data.toString();
+      });
+    } on DioException catch (e) {
+      setState(() {
+        result = _handleError(e);
+      });
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> downloadFile() async {
+    setState(() {
+      isLoading = true;
+      progress = 0;
+    });
+
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final filePath = '${dir.path}/image.jpg';
+
+      await dio.download(
+        'https://picsum.photos/600',
+        filePath,
+        cancelToken: cancelToken,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            setState(() {
+              progress = received / total;
+            });
+          }
+        },
+      );
+
+      setState(() {
+        result = "Файл сохранен: $filePath";
+      });
+    } on DioException catch (e) {
+      setState(() {
+        result = _handleError(e);
+      });
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  String _handleError(DioException e) {
+    if (CancelToken.isCancel(e)) {
+      return "Запрос отменён";
+    }
+
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.unknown) {
+      return "Нет подключения к интернету";
+    }
+
+    final statusCode = e.response?.statusCode;
+
+    switch (statusCode) {
+      case 400:
+        return "Ошибка 400: Неверный запрос";
+      case 401:
+        return "Ошибка 401: Неавторизован";
+      case 500:
+        return "Ошибка 500: Ошибка сервера";
+      default:
+        return "Неизвестная ошибка";
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Dio Example")),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            ElevatedButton(
+              onPressed: fetchData,
+              child: const Text("GET запрос"),
+            ),
+            ElevatedButton(
+              onPressed: downloadFile,
+              child: const Text("Скачать файл"),
+            ),
+            if (isLoading) ...[
+              const SizedBox(height: 20),
+              const CircularProgressIndicator(),
+              if (progress > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text("${(progress * 100).toStringAsFixed(0)}%"),
+                ),
+            ],
+            const SizedBox(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(result),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
