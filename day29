@@ -1,0 +1,248 @@
+import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
+part 'main.g.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+@DriftDatabase(tables: [Tasks, Tags])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  @override
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from == 1) {
+            await m.addColumn(tasks, tasks.isCompleted);
+          }
+        },
+      );
+
+  // CRUD
+
+  Future<int> addTask(TasksCompanion task) =>
+      into(tasks).insert(task);
+
+  Future updateTask(Task task) =>
+      update(tasks).replace(task);
+
+  Future deleteTask(int id) =>
+      (delete(tasks)..where((t) => t.id.equals(id))).go();
+
+  Stream<List<TaskWithTag>> watchTasksSorted(String sortBy) {
+    final query = select(tasks).join([
+      leftOuterJoin(tags, tags.id.equalsExp(tasks.tagId)),
+    ]);
+
+    if (sortBy == 'date') {
+      query.orderBy([OrderingTerm.desc(tasks.createdAt)]);
+    } else {
+      query.orderBy([OrderingTerm.desc(tasks.priority)]);
+    }
+
+    return query.watch().map((rows) {
+      return rows.map((row) {
+        return TaskWithTag(
+          row.readTable(tasks),
+          row.readTableOrNull(tags),
+        );
+      }).toList();
+    });
+  }
+
+  Future<List<TaskWithTag>> getTasksOnce() async {
+    final query = select(tasks).join([
+      leftOuterJoin(tags, tags.id.equalsExp(tasks.tagId)),
+    ]);
+
+    final rows = await query.get();
+
+    return rows.map((row) {
+      return TaskWithTag(
+        row.readTable(tasks),
+        row.readTableOrNull(tags),
+      );
+    }).toList();
+  }
+
+  Future<void> exportToJson() async {
+    final data = await getTasksOnce();
+    final list = data.map((e) => e.toJson()).toList();
+
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dir.path, 'tasks_export.json'));
+
+    await file.writeAsString(jsonEncode(list));
+  }
+
+  Future<void> importFromJson() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dir.path, 'tasks_export.json'));
+
+    if (!await file.exists()) return;
+
+    final content = await file.readAsString();
+    final List decoded = jsonDecode(content);
+
+    for (var item in decoded) {
+      await addTask(TasksCompanion.insert(
+        title: item['title'],
+        priority: item['priority'],
+        createdAt: DateTime.parse(item['createdAt']),
+        tagId: Value(item['tagId']),
+        isCompleted: Value(item['isCompleted']),
+      ));
+    }
+  }
+}
+
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dir.path, 'app.db'));
+    return NativeDatabase(file);
+  });
+}
+
+class Tasks extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text()();
+  IntColumn get priority => integer()();
+  DateTimeColumn get createdAt => dateTime()();
+  IntColumn get tagId => integer().nullable().references(Tags, #id)();
+  BoolColumn get isCompleted =>
+      boolean().withDefault(const Constant(false))();
+}
+
+class Tags extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+}
+
+class TaskWithTag {
+  final Task task;
+  final Tag? tag;
+
+  TaskWithTag(this.task, this.tag);
+
+  Map<String, dynamic> toJson() => {
+        'title': task.title,
+        'priority': task.priority,
+        'createdAt': task.createdAt.toIso8601String(),
+        'tagId': task.tagId,
+        'isCompleted': task.isCompleted,
+      };
+}
+
+class MyApp extends StatelessWidget {
+  final db = AppDatabase();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: TaskPage(db: db),
+    );
+  }
+}
+
+class TaskPage extends StatefulWidget {
+  final AppDatabase db;
+
+  TaskPage({required this.db});
+
+  @override
+  State<TaskPage> createState() => _TaskPageState();
+}
+
+class _TaskPageState extends State<TaskPage> {
+  String sortBy = 'date';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Drift CRUD Demo"),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.import_export),
+            onPressed: widget.db.exportToJson,
+          ),
+          IconButton(
+            icon: Icon(Icons.file_download),
+            onPressed: widget.db.importFromJson,
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          widget.db.addTask(
+            TasksCompanion.insert(
+              title: "Task ${DateTime.now()}",
+              priority: 1,
+              createdAt: DateTime.now(),
+            ),
+          );
+        },
+        child: Icon(Icons.add),
+      ),
+      body: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                  onPressed: () => setState(() => sortBy = 'date'),
+                  child: Text("Sort by Date")),
+              SizedBox(width: 10),
+              ElevatedButton(
+                  onPressed: () => setState(() => sortBy = 'priority'),
+                  child: Text("Sort by Priority")),
+            ],
+          ),
+          Expanded(
+            child: StreamBuilder(
+              stream: widget.db.watchTasksSorted(sortBy),
+              builder: (context, snapshot) {
+                final tasks = snapshot.data ?? [];
+                return ListView.builder(
+                  itemCount: tasks.length,
+                  itemBuilder: (_, i) {
+                    final item = tasks[i];
+                    return ListTile(
+                      title: Text(item.task.title),
+                      subtitle: Text(
+                          "Priority: ${item.task.priority}"),
+                      trailing: IconButton(
+                        icon: Icon(Icons.delete),
+                        onPressed: () =>
+                            widget.db.deleteTask(item.task.id),
+                      ),
+                      onTap: () {
+                        widget.db.updateTask(
+                          item.task.copyWith(
+                            isCompleted:
+                                !item.task.isCompleted,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
