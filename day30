@@ -1,0 +1,78 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:get_it/get_it.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// --- Interfaces & Classes ---
+abstract class ApiClient {
+  Future<String> fetchData();
+}
+
+class RealApiClient implements ApiClient {
+  @override
+  Future<String> fetchData() async => "Data from Production Server";
+}
+
+class MockApiClient implements ApiClient {
+  @override
+  Future<String> fetchData() async => "Data from Mock API";
+}
+
+class DataRepository {
+  final ApiClient apiClient;
+  DataRepository(this.apiClient);
+}
+
+class GetDataUseCase {
+  final DataRepository repository;
+  GetDataUseCase(this.repository);
+  Future<String> execute() => repository.apiClient.fetchData();
+}
+
+// --- Dependency Injection ---
+final sl = GetIt.instance;
+
+Future<void> initDI() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Асинхронный сервис
+  sl.registerSingletonAsync<SharedPreferences>(() async => await SharedPreferences.getInstance());
+
+  // Переключение Mock/Real
+  sl.registerLazySingleton<ApiClient>(() => kReleaseMode ? RealApiClient() : MockApiClient());
+
+  // Регистрация слоев
+  sl.registerLazySingleton(() => DataRepository(sl<ApiClient>()));
+  sl.registerLazySingleton(() => GetDataUseCase(sl<DataRepository>()));
+
+  await sl.allReady();
+}
+
+// --- UI Layer ---
+void main() async {
+  await initDI();
+  runApp(const MaterialApp(home: HomeScreen()));
+}
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Получаем UseCase напрямую из GetIt
+    final useCase = sl<GetDataUseCase>();
+
+    return Scaffold(
+      app_appBar: AppBar(title: const Text('GetIt DI Example')),
+      body: Center(
+        child: FutureBuilder<String>(
+          future: useCase.execute(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) return const CircularProgressIndicator();
+            return Text(snapshot.data ?? 'Error', style: const TextStyle(fontSize: 20));
+          },
+        ),
+      ),
+    );
+  }
+}
