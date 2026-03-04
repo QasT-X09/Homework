@@ -1,0 +1,175 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'task_service.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+
+  @override
+  Widget build(BuildContext context) {
+
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: TaskPage(),
+    );
+
+  }
+}
+
+class TaskPage extends StatefulWidget {
+
+  @override
+  State<TaskPage> createState() => _TaskPageState();
+
+}
+
+class _TaskPageState extends State<TaskPage> {
+
+  final TaskService service = TaskService();
+
+  List<QueryDocumentSnapshot> tasks = [];
+
+  final TextEditingController controller = TextEditingController();
+
+  bool loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    loadMore();
+  }
+
+  Future<void> loadMore() async {
+
+    setState(() {
+      loading = true;
+    });
+
+    final newTasks = await service.loadTasks();
+
+    setState(() {
+      tasks.addAll(newTasks);
+      loading = false;
+    });
+
+  }
+
+  void addTask() async {
+
+    await service.addTask(
+      title: controller.text,
+      category: "general",
+    );
+
+    controller.clear();
+
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
+    return Scaffold(
+
+      appBar: AppBar(
+        title: Text("Firestore Tasks"),
+      ),
+
+      body: Column(
+
+        children: [
+
+          Padding(
+            padding: EdgeInsets.all(10),
+            child: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: "New task",
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.add),
+                  onPressed: addTask,
+                ),
+              ),
+            ),
+          ),
+
+          Expanded(
+
+            child: ListView.builder(
+
+              itemCount: tasks.length,
+
+              itemBuilder: (context, index) {
+
+                final doc = tasks[index];
+                final data = doc.data() as Map<String, dynamic>;
+
+                return ListTile(
+
+                  title: Text(data["title"] ?? ""),
+
+                  subtitle: Text(data["category"] ?? ""),
+
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+
+                      IconButton(
+                        icon: Icon(Icons.edit),
+                        onPressed: () {
+
+                          service.updateTask(
+                            doc.id,
+                            {"status": "done"},
+                          );
+
+                        },
+                      ),
+
+                      IconButton(
+                        icon: Icon(Icons.delete),
+                        onPressed: () {
+
+                          service.deleteTask(doc.id);
+
+                          setState(() {
+                            tasks.removeAt(index);
+                          });
+
+                        },
+                      ),
+
+                    ],
+                  ),
+                );
+
+              },
+
+            ),
+
+          ),
+
+          if (loading)
+            Padding(
+              padding: EdgeInsets.all(10),
+              child: CircularProgressIndicator(),
+            ),
+
+          ElevatedButton(
+            onPressed: loadMore,
+            child: Text("Load More"),
+          )
+
+        ],
+
+      ),
+
+    );
+
+  }
+
+}
+
+////
