@@ -1,0 +1,141 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'notification_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
+  await NotificationService.init();
+
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+
+  @override
+  Widget build(BuildContext context) {
+
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      routes: {
+        "/": (context) => HomePage(),
+        "/details": (context) => NotificationDetails(),
+      },
+    );
+
+  }
+}
+
+class HomePage extends StatelessWidget {
+
+  @override
+  Widget build(BuildContext context) {
+
+    return Scaffold(
+      appBar: AppBar(title: Text("Push Demo")),
+      body: Center(
+        child: Text("Send push from Firebase Console"),
+      ),
+    );
+
+  }
+}
+
+class NotificationDetails extends StatelessWidget {
+
+  @override
+  Widget build(BuildContext context) {
+
+    final id = ModalRoute.of(context)!.settings.arguments;
+
+    return Scaffold(
+      appBar: AppBar(title: Text("Notification Details")),
+      body: Center(
+        child: Text("Payload ID: $id"),
+      ),
+    );
+
+  }
+}
+
+
+//////////
+///////////
+//////////
+//////////
+////////
+//////////
+/////////
+///////// был на работе седалал в одном файле
+notification_service.dart
+  import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class NotificationService {
+
+  static final FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  static final FlutterLocalNotificationsPlugin localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  static Future init() async {
+
+    await messaging.requestPermission();
+
+    String? token = await messaging.getToken();
+
+    print("FCM TOKEN: $token");
+
+    saveToken(token);
+
+    FirebaseMessaging.instance.onTokenRefresh.listen(saveToken);
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+
+      showNotification(message);
+
+    });
+
+  }
+
+  static Future saveToken(String? token) async {
+
+    if (token == null) return;
+
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? "test";
+
+    await FirebaseFirestore.instance
+        .collection("users")
+        .doc(uid)
+        .set({
+          "fcmToken": token,
+        }, SetOptions(merge: true));
+
+  }
+
+  static Future showNotification(RemoteMessage message) async {
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      "channel",
+      "channel",
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    const NotificationDetails details =
+        NotificationDetails(android: androidDetails);
+
+    await localNotifications.show(
+      0,
+      message.notification?.title,
+      message.notification?.body,
+      details,
+    );
+
+  }
+
+}
