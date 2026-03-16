@@ -1,0 +1,222 @@
+/// task_service.dart
+class TaskService {
+
+  final List<String> _tasks = [];
+
+  List<String> loadTasks() {
+    return _tasks;
+  }
+
+  void addTask(String task) {
+
+    if (task.isEmpty) {
+      throw Exception("Task cannot be empty");
+    }
+
+    _tasks.add(task);
+  }
+
+}
+
+/// error_handler.dart
+class ErrorHandler {
+
+  static String handleError(Object e) {
+    return e.toString();
+  }
+
+}
+
+/// task_model.dart
+class TaskModel {
+
+  final List<String> tasks;
+
+  TaskModel(this.tasks);
+
+}
+
+/// task_controller.dart
+class TaskController {
+
+  final TaskService service;
+
+  TaskController(this.service);
+
+  TaskModel load() {
+
+    return TaskModel(
+      service.loadTasks(),
+    );
+
+  }
+
+  void add(String task) {
+
+    service.addTask(task);
+
+  }
+
+}
+
+/// task_page.dart
+import 'package:flutter/material.dart';
+
+class TaskPage extends StatefulWidget {
+
+  final TaskController controller;
+
+  const TaskPage(this.controller, {super.key});
+
+  @override
+  State<TaskPage> createState() => _TaskPageState();
+
+}
+
+class _TaskPageState extends State<TaskPage> {
+
+  final TextEditingController input = TextEditingController();
+
+  List<String> tasks = [];
+
+  /// загрузка задач
+  void load() {
+
+    setState(() {
+
+      tasks = widget.controller.load().tasks;
+
+    });
+
+  }
+
+  /// добавление задачи
+  void add() {
+
+    try {
+
+      widget.controller.add(input.text);
+
+      input.clear();
+
+      load();
+
+    } catch (e) {
+
+      final error = ErrorHandler.handleError(e);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+
+        SnackBar(
+          content: Text(error),
+        ),
+
+      );
+
+    }
+
+  }
+
+  @override
+  void initState() {
+
+    super.initState();
+
+    load();
+
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
+    return Scaffold(
+
+      appBar: AppBar(
+        title: const Text("Task App"),
+      ),
+
+      body: Column(
+
+        children: [
+
+          Padding(
+
+            padding: const EdgeInsets.all(12),
+
+            child: Row(
+
+              children: [
+
+                Expanded(
+
+                  child: TextField(
+                    controller: input,
+                    decoration: const InputDecoration(
+                      hintText: "Enter task",
+                    ),
+                  ),
+
+                ),
+
+                IconButton(
+
+                  onPressed: add,
+
+                  icon: const Icon(Icons.add),
+
+                ),
+
+              ],
+
+            ),
+
+          ),
+
+          Expanded(
+
+            child: ListView.builder(
+
+              itemCount: tasks.length,
+
+              itemBuilder: (context, index) {
+
+                return ListTile(
+
+                  title: Text(tasks[index]),
+
+                );
+
+              },
+
+            ),
+
+          ),
+
+        ],
+
+      ),
+
+    );
+
+  }
+
+}
+
+/// main.dart
+void main() {
+
+  final service = TaskService();
+
+  final controller = TaskController(service);
+
+  runApp(
+
+    MaterialApp(
+
+      home: TaskPage(controller),
+
+    ),
+
+  );
+
+}
