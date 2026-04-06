@@ -1,0 +1,262 @@
+///repository.dart
+abstract class Repository {
+  Future<List<String>> fetchItems();
+}
+
+class FakeRepository implements Repository {
+  List<String>? _data;
+  bool shouldFail = false;
+  bool isLoading = false;
+
+  void setData(List<String> data) {
+    _data = data;
+    isLoading = false;
+    shouldFail = false;
+  }
+
+  void setLoading() {
+    isLoading = true;
+  }
+
+  void setError() {
+    shouldFail = true;
+    isLoading = false;
+  }
+
+  @override
+  Future<List<String>> fetchItems() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (shouldFail) {
+      throw Exception('Ошибка загрузки');
+    }
+
+    return _data ?? [];
+  }
+}
+
+//////////////main.dart
+import 'package:flutter/material.dart';
+import 'repository.dart';
+import 'list_screen.dart';
+
+void main() {
+  runApp(MyApp(repository: FakeRepository()));
+}
+
+class MyApp extends StatelessWidget {
+  final Repository repository;
+
+  const MyApp({super.key, required this.repository});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: ListScreen(repository: repository),
+    );
+  }
+}
+/////////////////list_screen.dart
+import 'package:flutter/material.dart';
+import 'repository.dart';
+import 'detail_screen.dart';
+
+class ListScreen extends StatefulWidget {
+  final Repository repository;
+
+  const ListScreen({super.key, required this.repository});
+
+  @override
+  State<ListScreen> createState() => _ListScreenState();
+}
+
+class _ListScreenState extends State<ListScreen> {
+  List<String> items = [];
+  bool isLoading = false;
+  String? error;
+
+  final controller = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
+
+    try {
+      final data = await widget.repository.fetchItems();
+      setState(() {
+        items = data;
+      });
+    } catch (e) {
+      setState(() {
+        error = 'Ошибка загрузки';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка загрузки')),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  void addItem() {
+    final text = controller.text;
+    if (text.isEmpty) return;
+
+    setState(() {
+      items.add(text);
+    });
+
+    controller.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(key: Key('loader')),
+        ),
+      );
+    }
+
+    if (error != null) {
+      return Scaffold(
+        body: Center(
+          child: Text(error!, key: const Key('errorText')),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('List')),
+      body: Column(
+        children: [
+          TextField(
+            key: const Key('inputField'),
+            controller: controller,
+          ),
+          ElevatedButton(
+            key: const Key('addButton'),
+            onPressed: addItem,
+            child: const Text('Add'),
+          ),
+          Expanded(
+            child: items.isEmpty
+                ? const Center(
+                    child: Text('Нет данных', key: Key('emptyState')),
+                  )
+                : ListView.builder(
+                    key: const Key('itemsList'),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return ListTile(
+                        title: Text(item),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DetailScreen(item: item),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+//////////detail_screen.dart
+import 'package:flutter/material.dart';
+
+class DetailScreen extends StatelessWidget {
+  final String item;
+
+  const DetailScreen({super.key, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Text('Detail: $item', key: const Key('detailScreen')),
+      ),
+    );
+  }
+}
+/////////widget_test.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:test_project/main.dart';
+import 'package:test_project/repository.dart';
+
+void main() {
+  testWidgets('Empty -> Loading -> Data', (tester) async {
+    final repo = FakeRepository();
+
+    await tester.pumpWidget(MyApp(repository: repo));
+
+    // initial (empty)
+    expect(find.byKey(const Key('emptyState')), findsOneWidget);
+
+    // loading
+    repo.setLoading();
+    await tester.pump();
+    expect(find.byKey(const Key('loader')), findsOneWidget);
+
+    // data
+    repo.setData(['Item 1']);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Item 1'), findsOneWidget);
+  });
+
+  testWidgets('Add item', (tester) async {
+    final repo = FakeRepository();
+
+    await tester.pumpWidget(MyApp(repository: repo));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('inputField')), 'New Item');
+    await tester.tap(find.byKey(const Key('addButton')));
+    await tester.pump();
+
+    expect(find.text('New Item'), findsOneWidget);
+  });
+
+  testWidgets('Error state', (tester) async {
+    final repo = FakeRepository()..setError();
+
+    await tester.pumpWidget(MyApp(repository: repo));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('errorText')), findsOneWidget);
+    expect(find.text('Ошибка загрузки'), findsOneWidget);
+  });
+
+  testWidgets('Navigation to detail screen', (tester) async {
+    final repo = FakeRepository()..setData(['Item 1']);
+
+    await tester.pumpWidget(MyApp(repository: repo));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Item 1'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('detailScreen')), findsOneWidget);
+  });
+}
+/////////
