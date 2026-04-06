@@ -1,0 +1,194 @@
+//task_service.dart
+class TaskService {
+  final List<String> _tasks = [];
+
+  List<String> loadTasks() {
+    return _tasks;
+  }
+
+  void addTask(String task) {
+    if (task.isEmpty) {
+      throw Exception("Task cannot be empty");
+    }
+    _tasks.add(task);
+  }
+}
+///error_handler.dart
+class ErrorHandler {
+  static String handleError(Object e) {
+    return e.toString();
+  }
+}
+////task_model.dart
+class TaskModel {
+  final List<String> tasks;
+
+  TaskModel(this.tasks);
+}
+///task_controller.dart
+import '../model/task_model.dart';
+import '../../services/task_service.dart';
+
+class TaskController {
+  final TaskService service;
+
+  TaskController(this.service);
+
+  TaskModel load() {
+    return TaskModel(service.loadTasks());
+  }
+
+  void add(String task) {
+    service.addTask(task);
+  }
+}
+////task_page.dart
+import 'package:flutter/material.dart';
+import '../controller/task_controller.dart';
+import '../../services/error_handler.dart';
+
+class TaskPage extends StatefulWidget {
+  final TaskController controller;
+
+  TaskPage(this.controller);
+
+  @override
+  _TaskPageState createState() => _TaskPageState();
+}
+
+class _TaskPageState extends State<TaskPage> {
+
+  final TextEditingController input = TextEditingController();
+  List<String> tasks = [];
+
+  void load() {
+    setState(() {
+      tasks = widget.controller.load().tasks;
+    });
+  }
+
+  void add() {
+    try {
+      widget.controller.add(input.text);
+      input.clear();
+      load();
+    } catch (e) {
+      final error = ErrorHandler.handleError(e);
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("MVC Tasks")),
+      body: Column(
+        children: [
+          TextField(controller: input),
+          ElevatedButton(
+            onPressed: add,
+            child: Text("Add"),
+          ),
+          Expanded(
+            child: ListView(
+              children: tasks.map((t) => ListTile(title: Text(t))).toList(),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+}
+///task_view.dart
+abstract class TaskView {
+  void showTasks(List<String> tasks);
+  void showError(String message);
+}
+///task_presenter.dart
+import '../view/task_view.dart';
+import '../../services/task_service.dart';
+import '../../services/error_handler.dart';
+
+class TaskPresenter {
+
+  final TaskService service;
+  final TaskView view;
+
+  TaskPresenter(this.service, this.view);
+
+  void load() {
+    try {
+      final tasks = service.loadTasks();
+      view.showTasks(tasks);
+    } catch (e) {
+      view.showError(ErrorHandler.handleError(e));
+    }
+  }
+
+  void add(String task) {
+    try {
+      service.addTask(task);
+      load();
+    } catch (e) {
+      view.showError(ErrorHandler.handleError(e));
+    }
+  }
+}
+///task_page.dart
+import 'package:flutter/material.dart';
+import 'task_view.dart';
+import '../presenter/task_presenter.dart';
+
+class TaskPage extends StatefulWidget {
+  final TaskPresenter presenter;
+
+  TaskPage(this.presenter);
+
+  @override
+  _TaskPageState createState() => _TaskPageState();
+}
+
+class _TaskPageState extends State<TaskPage> implements TaskView {
+
+  final TextEditingController input = TextEditingController();
+  List<String> tasks = [];
+
+  @override
+  void showTasks(List<String> t) {
+    setState(() {
+      tasks = t;
+    });
+  }
+
+  @override
+  void showError(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("MVP Tasks")),
+      body: Column(
+        children: [
+          TextField(controller: input),
+          ElevatedButton(
+            onPressed: () {
+              widget.presenter.add(input.text);
+            },
+            child: Text("Add"),
+          ),
+          Expanded(
+            child: ListView(
+              children: tasks.map((t) => ListTile(title: Text(t))).toList(),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+}
+///
