@@ -1,0 +1,188 @@
+////////📁test/repository/user_repository_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+// ===== Mock classes =====
+class MockApiClient extends Mock implements ApiClient {}
+class MockDatabase extends Mock implements Database {}
+
+// ===== Example models =====
+class User {
+  final String name;
+  User(this.name);
+}
+
+// ===== Repository =====
+class UserRepository {
+  final ApiClient api;
+  final Database db;
+
+  UserRepository(this.api, this.db);
+
+  Future<User> fetchUser() async {
+    final json = await api.getUser();
+    return User(json['name']);
+  }
+}
+
+// ===== Interfaces =====
+abstract class ApiClient {
+  Future<Map<String, dynamic>> getUser();
+}
+
+abstract class Database {}
+
+void main() {
+  late MockApiClient api;
+  late MockDatabase db;
+  late UserRepository repo;
+
+  setUp(() {
+    api = MockApiClient();
+    db = MockDatabase();
+    repo = UserRepository(api, db);
+  });
+
+  test('fetchUser returns mapped User', () async {
+    when(() => api.getUser()).thenAnswer(
+      (_) async => {'name': 'Alex'},
+    );
+
+    final user = await repo.fetchUser();
+
+    expect(user.name, 'Alex');
+    verify(() => api.getUser()).called(1);
+  });
+}
+
+
+////////////////////📁integration_test/app_flow_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:my_app/main.dart';
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('full flow: login -> list -> add -> logout', (tester) async {
+    await tester.pumpWidget(MyApp());
+
+    // Login
+    await tester.enterText(find.byKey(Key('loginField')), 'user');
+    await tester.enterText(find.byKey(Key('passwordField')), '1234');
+    await tester.tap(find.byKey(Key('loginButton')));
+    await tester.pumpAndSettle();
+
+    // Check list screen
+    expect(find.byKey(Key('listScreen')), findsOneWidget);
+
+    // Add item
+    await tester.tap(find.byKey(Key('addButton')));
+    await tester.enterText(find.byKey(Key('inputField')), 'New item');
+    await tester.tap(find.byKey(Key('saveButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('New item'), findsOneWidget);
+
+    // Logout
+    await tester.tap(find.byKey(Key('logoutButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(Key('loginScreen')), findsOneWidget);
+  });
+}
+
+/////////////////////📁test/di_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:get_it/get_it.dart';
+
+final getIt = GetIt.instance;
+
+class ApiClient {}
+class FakeApiClient extends ApiClient {}
+
+void setupDI() {
+  getIt.registerLazySingleton<ApiClient>(() => FakeApiClient());
+}
+
+void main() {
+  test('DI uses fake implementation', () {
+    setupDI();
+
+    final api = getIt<ApiClient>();
+
+    expect(api, isA<FakeApiClient>());
+  });
+}
+
+////////////📁 test/fake_server.dart
+class FakeServer {
+  Future<Map<String, dynamic>> login() async {
+    return {
+      "token": "fake_token_123"
+    };
+  }
+
+  Future<List<Map<String, dynamic>>> getItems() async {
+    return [
+      {"id": 1, "title": "Item 1"},
+      {"id": 2, "title": "Item 2"}
+    ];
+  }
+
+  Future<Map<String, dynamic>> addItem(String title) async {
+    return {
+      "id": 3,
+      "title": title
+    };
+  }
+}
+
+//////////📁 test/no_real_network_test.dart
+import 'package:flutter_test/flutter_test.dart';
+
+bool realNetworkCalled = false;
+
+class ApiClient {
+  Future<void> call() async {
+    realNetworkCalled = true;
+  }
+}
+
+void main() {
+  test('no real network calls', () async {
+    // здесь должен использоваться mock/fake
+    expect(realNetworkCalled, false);
+  });
+}
+
+///////📁 .github/workflows/flutter_test.yml
+name: Flutter Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Run integration tests
+        run: flutter test integration_test
+
