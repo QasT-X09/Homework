@@ -1,0 +1,104 @@
+////android/app/key.properties
+storePassword=your_store_password
+keyPassword=your_key_password
+keyAlias=your_key_alias
+storeFile=keystore.jks
+////android/app/build.gradle
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("app/key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace "com.example.app"
+
+    defaultConfig {
+        applicationId "com.example.app"
+        minSdkVersion 21
+        targetSdkVersion 34
+
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+}
+////pubspec.yaml
+dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
+////flutter_launcher_icons.yaml
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon.png"
+////flutter_native_splash.yaml
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/splash.png
+
+  android: true
+  ios: false
+///android/app/src/main/AndroidManifest.xml
+<!-- Интернет -->
+<uses-permission android:name="android.permission.INTERNET"/>
+
+<!-- Камера -->
+<uses-permission android:name="android.permission.CAMERA"/>
+
+<!-- Фото -->
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+
+<!-- Уведомления (Android 13+) -->
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+///Приложение использует:
+- Камеру — для сканирования/фото
+- Хранилище — для выбора изображений
+- Уведомления — для информирования пользователя
+
+Данные не передаются третьим лицам и используются только внутри приложения.
+////docs/release_plan.md
+# Release план
+
+## Версия
+1.0.0 (versionCode: 1)
+
+## Основные изменения
+- Базовый функционал списка
+- Добавление элементов
+- Навигация
+
+## Риски
+- Возможные краши при загрузке данных
+- Ошибки UI на старых устройствах
+- Некорректные permissions
+
+## Известные баги
+- Иногда задержка загрузки
+- Нет оффлайн режима
+
+## План отката
+1. Отключить rollout в Play Console
+2. Вернуться к предыдущему versionCode
+3. Выпустить hotfix (versionCode +1)
+4. Сообщить тестерам
+
+## Контроль
+- Crashlytics (если подключён)
+- Логи тестеров
