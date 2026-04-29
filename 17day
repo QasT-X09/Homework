@@ -1,0 +1,98 @@
+///// providers/tasks_provider.dart
+import 'package:flutter/material.dart';
+
+class TasksProvider extends ChangeNotifier {
+  List<String> tasks = [];
+
+  void addTask(String task) {
+    tasks.add(task);
+    notifyListeners();
+  }
+
+  void removeTask(int index) {
+    tasks.removeAt(index);
+    notifyListeners();
+  }
+}
+
+/////////  screens/home_screen.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/tasks_provider.dart';
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = context.watch<TasksProvider>().tasks;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Список задач'),
+      ),
+
+      body: tasks.isEmpty
+          ? const Center(child: Text('Нет задач'))
+          : ListView.builder(
+              itemCount: tasks.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(tasks[index]),
+
+                  onLongPress: () {
+                    context.read<TasksProvider>().removeTask(index);
+                  },
+                );
+              },
+            ),
+
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          context.read<TasksProvider>().addTask("Новая задача");
+        },
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+/////////  main.dart
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'providers/tasks_provider.dart';
+import 'screens/home_screen.dart';
+
+void main() {
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => TasksProvider(),
+      child: const MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Tasks App',
+      debugShowCheckedModeBanner: false,
+      home: const HomeScreen(),
+    );
+  }
+}
+
+////  YAML
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+
+/////  Potom 
+flutter pub get
+
+
+
