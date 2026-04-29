@@ -1,0 +1,290 @@
+//////main.dart
+import 'package:flutter/material.dart';
+import 'animation_screen.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: const AnimationScreen(),
+    );
+  }
+}
+
+
+
+//////animation_screen.dart
+import 'package:flutter/material.dart';
+
+class AnimationScreen extends StatefulWidget {
+  const AnimationScreen({super.key});
+
+  @override
+  State<AnimationScreen> createState() => _AnimationScreenState();
+}
+
+class _AnimationScreenState extends State<AnimationScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController controller;
+  late Animation<double> scale;
+  late Animation<Offset> offset;
+
+  @override
+  void initState() {
+    super.initState();
+
+    controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+
+    scale = Tween(begin: 1.0, end: 1.5).animate(
+      CurvedAnimation(parent: controller, curve: Curves.easeInOut),
+    );
+
+    offset = Tween(begin: Offset.zero, end: const Offset(100, 0)).animate(
+      CurvedAnimation(parent: controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.dispose(); // ОБЯЗАТЕЛЬНО
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Animation Practice")),
+
+      body: Center(
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (context, child) {
+            return Transform.translate(
+              offset: offset.value,
+              child: Transform.scale(
+                scale: scale.value,
+                child: child,
+              ),
+            );
+          },
+          child: Container(
+            width: 100,
+            height: 100,
+            color: Colors.blue,
+          ),
+        ),
+      ),
+
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            ElevatedButton(
+              onPressed: () => controller.forward(),
+              child: const Text("Start"),
+            ),
+            ElevatedButton(
+              onPressed: () => controller.reverse(),
+              child: const Text("Reverse"),
+            ),
+            ElevatedButton(
+              onPressed: () => controller.stop(),
+              child: const Text("Stop"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/////implicit_example.dart
+import 'package:flutter/material.dart';
+
+class ImplicitExample extends StatefulWidget {
+  const ImplicitExample({super.key});
+
+  @override
+  State<ImplicitExample> createState() => _ImplicitExampleState();
+}
+
+class _ImplicitExampleState extends State<ImplicitExample> {
+  double size = 100;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(seconds: 1),
+          width: size,
+          height: size,
+          color: Colors.red,
+        ),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              size = size == 100 ? 200 : 100;
+            });
+          },
+          child: const Text("Animate"),
+        )
+      ],
+    );
+  }
+}
+
+
+
+/////controller_example.dart
+import 'package:flutter/material.dart';
+
+class ControllerExample extends StatefulWidget {
+  const ControllerExample({super.key});
+
+  @override
+  State<ControllerExample> createState() => _ControllerExampleState();
+}
+
+class _ControllerExampleState extends State<ControllerExample>
+    with SingleTickerProviderStateMixin {
+  late AnimationController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: () => controller.forward(),
+          child: const Text("Forward"),
+        ),
+        ElevatedButton(
+          onPressed: () => controller.reverse(),
+          child: const Text("Reverse"),
+        ),
+        ElevatedButton(
+          onPressed: () => controller.repeat(),
+          child: const Text("Repeat"),
+        ),
+      ],
+    );
+  }
+}
+
+//////tween_example.dart
+import 'package:flutter/material.dart';
+
+class TweenExample extends StatefulWidget {
+  const TweenExample({super.key});
+
+  @override
+  State<TweenExample> createState() => _TweenExampleState();
+}
+
+class _TweenExampleState extends State<TweenExample>
+    with SingleTickerProviderStateMixin {
+  late AnimationController controller;
+  late Animation<double> animation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+
+    animation = Tween(begin: 0.0, end: 300.0).animate(
+      CurvedAnimation(parent: controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        AnimatedBuilder(
+          animation: animation,
+          builder: (_, __) {
+            return Container(
+              width: animation.value,
+              height: 50,
+              color: Colors.green,
+            );
+          },
+        ),
+        ElevatedButton(
+          onPressed: () => controller.forward(),
+          child: const Text("Run"),
+        ),
+      ],
+    );
+  }
+}
+
+
+/////////builder_example.dart
+import 'package:flutter/material.dart';
+
+class BuilderExample extends StatefulWidget {
+  const BuilderExample({super.key});
+
+  @override
+  State<BuilderExample> createState() => _BuilderExampleState();
+}
+
+class _BuilderExampleState extends State<BuilderExample>
+    with SingleTickerProviderStateMixin {
+  late AnimationController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, child) {
+        return Transform.rotate(
+          angle: controller.value * 6.28,
+          child: child,
+        );
+      },
+      child: const Icon(Icons.refresh, size: 50),
+    );
+  }
+}
