@@ -1,0 +1,147 @@
+/////main.dart
+void main() {
+  // A1
+  print(sumToN(5)); // 15
+  print(sumToN(1)); // 1
+  print(sumToN(0)); // 0
+
+  // A2
+  print(sumList([1, 2, 3])); // 6
+  print(sumList([])); // 0
+
+  // A3
+  print(minMax([3, 1, 7])); // {min: 1, max: 7}
+  print(minMax([5])); // {min: 5, max: 5}
+
+  // A4
+  print(countEven([1, 2, 4, 5])); // 2
+  print(countEven([])); // 0
+
+  // A5
+  print(reverseList([1, 2, 3])); // [3, 2, 1]
+  print(reverseList([])); // []
+
+  // A6
+  print(filterNonNegative([-2, 0, 3])); // [0, 3]
+  print(filterNonNegative([-1, -5])); // []
+
+  // A7
+  print(removeX([1, 2, 2, 3], 2)); // [1, 3]
+  print(removeX([2, 2], 2)); // []
+
+  // A8
+  print(countUnique([1, 1, 2])); // 2
+  print(countUnique([])); // 0
+  print(countUnique([5, 5, 5])); // 1
+
+  // A9
+  print(removeDuplicates([1, 2, 1, 3, 2])); // [1, 2, 3]
+  print(removeDuplicates([4, 4, 4])); // [4]
+}
+
+// A1. Сумма 1..n
+int sumToN(int n) {
+  if (n <= 0) return 0;
+
+  int sum = 0;
+  for (int i = 1; i <= n; i++) {
+    sum += i;
+  }
+  return sum;
+}
+
+// A2. Сумма элементов списка
+int sumList(List<int> list) {
+  int sum = 0;
+  for (int num in list) {
+    sum += num;
+  }
+  return sum;
+}
+
+// A3. Минимум и максимум
+Map<String, int> minMax(List<int> list) {
+  if (list.isEmpty) {
+    throw Exception("Список пуст");
+  }
+
+  int min = list[0];
+  int max = list[0];
+
+  for (int num in list) {
+    if (num < min) min = num;
+    if (num > max) max = num;
+  }
+
+  return {"min": min, "max": max};
+}
+
+// A4. Количество чётных
+int countEven(List<int> list) {
+  int count = 0;
+
+  for (int num in list) {
+    if (num % 2 == 0) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+// A5. Разворот списка
+List<int> reverseList(List<int> list) {
+  List<int> result = [];
+
+  for (int i = list.length - 1; i >= 0; i--) {
+    result.add(list[i]);
+  }
+
+  return result;
+}
+
+// A6. Фильтр неотрицательных
+List<int> filterNonNegative(List<int> list) {
+  List<int> result = [];
+
+  for (int num in list) {
+    if (num >= 0) {
+      result.add(num);
+    }
+  }
+
+  return result;
+}
+
+// A7. Удалить все вхождения x
+List<int> removeX(List<int> list, int x) {
+  List<int> result = [];
+
+  for (int num in list) {
+    if (num != x) {
+      result.add(num);
+    }
+  }
+
+  return result;
+}
+
+// A8. Кол-во уникальных элементов
+int countUnique(List<int> list) {
+  return list.toSet().length;
+}
+
+// A9. Удалить дубликаты с сохранением порядка
+List<int> removeDuplicates(List<int> list) {
+  Set<int> seen = {};
+  List<int> result = [];
+
+  for (int num in list) {
+    if (!seen.contains(num)) {
+      seen.add(num);
+      result.add(num);
+    }
+  }
+
+  return result;
+}
