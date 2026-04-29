@@ -1,0 +1,295 @@
+/////////////
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^8.1.3
+
+  flutter pub get
+
+  //////main.dart
+  import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'day_27/cubit/counter_cubit.dart';
+import 'day_27/screens/loading_screen.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => CounterCubit()),
+      ],
+      child: const MaterialApp(
+        home: LoadingScreen(),
+      ),
+    );
+  }
+}
+
+
+/////cubit papka 
+//////counter_cubit.dart
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+class CounterState {
+  final int value;
+  final List<String> history;
+
+  CounterState(this.value, this.history);
+}
+
+class CounterCubit extends Cubit<CounterState> {
+  CounterCubit() : super(CounterState(0, []));
+
+  void increment() {
+    final newHistory = [...state.history, "Increment"];
+    if (newHistory.length > 10) newHistory.removeAt(0);
+
+    emit(CounterState(state.value + 1, newHistory));
+  }
+
+  void decrement() {
+    final newHistory = [...state.history, "Decrement"];
+    if (newHistory.length > 10) newHistory.removeAt(0);
+
+    emit(CounterState(state.value - 1, newHistory));
+  }
+
+  void clear() {
+    emit(CounterState(0, []));
+  }
+}
+
+
+////screen
+/////counter_screen.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../cubit/counter_cubit.dart';
+
+class CounterScreen extends StatelessWidget {
+  const CounterScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Cubit Counter")),
+
+      body: Column(
+        children: [
+          BlocBuilder<CounterCubit, CounterState>(
+            builder: (context, state) {
+              return Text("Value: ${state.value}");
+            },
+          ),
+
+          Expanded(
+            child: BlocBuilder<CounterCubit, CounterState>(
+              builder: (context, state) {
+                return ListView(
+                  children: state.history
+                      .map((e) => ListTile(title: Text(e)))
+                      .toList(),
+                );
+              },
+            ),
+          ),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              ElevatedButton(
+                onPressed: () => context.read<CounterCubit>().increment(),
+                child: const Text("+"),
+              ),
+              ElevatedButton(
+                onPressed: () => context.read<CounterCubit>().decrement(),
+                child: const Text("-"),
+              ),
+              ElevatedButton(
+                onPressed: () => context.read<CounterCubit>().clear(),
+                child: const Text("Clear"),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+}
+
+////login_screen.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/login_bloc.dart';
+import '../bloc/login_event.dart';
+import '../bloc/login_state.dart';
+
+class LoginScreen extends StatelessWidget {
+  LoginScreen({super.key});
+
+  final email = TextEditingController();
+  final pass = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => LoginBloc(),
+      child: Scaffold(
+        appBar: AppBar(title: const Text("Login")),
+
+        body: BlocListener<LoginBloc, LoginState>(
+          listener: (context, state) {
+            if (state is LoginError) {
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(state.message)));
+            }
+          },
+          child: Column(
+            children: [
+              TextField(controller: email),
+              TextField(controller: pass),
+
+              BlocBuilder<LoginBloc, LoginState>(
+                builder: (context, state) {
+                  if (state is LoginLoading) {
+                    return const CircularProgressIndicator();
+                  }
+
+                  return ElevatedButton(
+                    onPressed: () {
+                      context.read<LoginBloc>().add(
+                            LoginSubmitted(email.text, pass.text),
+                          );
+                    },
+                    child: const Text("Login"),
+                  );
+                },
+              ),
+
+              BlocBuilder<LoginBloc, LoginState>(
+                builder: (context, state) {
+                  if (state is LoginSuccess) {
+                    return const Text("Success");
+                  }
+                  return const SizedBox();
+                },
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+////loading_screen.dart
+
+import 'package:flutter/material.dart';
+
+class LoadingScreen extends StatefulWidget {
+  const LoadingScreen({super.key});
+
+  @override
+  State<LoadingScreen> createState() => _LoadingScreenState();
+}
+
+class _LoadingScreenState extends State<LoadingScreen> {
+  String state = "idle";
+
+  void load() async {
+    setState(() => state = "loading");
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (DateTime.now().second % 2 == 0) {
+      setState(() => state = "success");
+    } else {
+      setState(() => state = "error");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget content;
+
+    if (state == "loading") {
+      content = const CircularProgressIndicator();
+    } else if (state == "success") {
+      content = const Text("Данные загружены");
+    } else if (state == "error") {
+      content = Column(
+        children: [
+          const Text("Ошибка"),
+          ElevatedButton(onPressed: load, child: const Text("Повторить"))
+        ],
+      );
+    } else {
+      content = ElevatedButton(onPressed: load, child: const Text("Загрузить"));
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Loading Example")),
+      body: Center(child: content),
+    );
+  }
+}
+
+///BLOC login
+/////login_event.dart
+abstract class LoginEvent {}
+
+class LoginSubmitted extends LoginEvent {
+  final String email;
+  final String password;
+
+  LoginSubmitted(this.email, this.password);
+}
+
+////login_state.dart
+abstract class LoginState {}
+
+class LoginInitial extends LoginState {}
+class LoginLoading extends LoginState {}
+class LoginSuccess extends LoginState {}
+class LoginError extends LoginState {
+  final String message;
+  LoginError(this.message);
+}
+
+////login_bloc.dart
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'login_event.dart';
+import 'login_state.dart';
+
+class LoginBloc extends Bloc<LoginEvent, LoginState> {
+  LoginBloc() : super(LoginInitial()) {
+    on<LoginSubmitted>((event, emit) async {
+      if (!event.email.contains("@")) {
+        emit(LoginError("Неверный email"));
+        return;
+      }
+
+      if (event.password.length < 4) {
+        emit(LoginError("Пароль слишком короткий"));
+        return;
+      }
+
+      emit(LoginLoading());
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (event.password == "1234") {
+        emit(LoginSuccess());
+      } else {
+        emit(LoginError("Неверный пароль"));
+      }
+    });
+  }
+}
+
